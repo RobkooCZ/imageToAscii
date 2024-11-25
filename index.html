@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Convertor</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="scripts.js" defer></script>
 </head>
 <body>
     <h1>IMAGE TO ASCII CONVERTOR</h1> 
     <div class="main">
-        <h2>Upload Image</h2>
-        <input type="file" id="file" accept="image/*">
+        <h2>Upload Image (.png, .jpeg, .jpg, .gif)</h2>
+        <input type="file" id="file" accept="image/png, image/jpeg, image/jpg, image/gif">
         <button id="convert">Convert</button>
         <h2>ASCII:</h2>
         <pre id="ascii"></pre>
