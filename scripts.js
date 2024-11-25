@@ -1,3 +1,28 @@
+/**
+ * Converts an image to grayscale.
+ *
+ * @param {HTMLImageElement} img - The image element to be converted.
+ * @param {HTMLCanvasElement} canvas - The canvas element where the image will be drawn.
+ * @param {CanvasRenderingContext2D} ctx - The 2D rendering context for the drawing surface of the canvas.
+ * @returns {ImageData} The ImageData object containing the grayscale image data.
+ */
+function convertImageToGrayscale(img, canvas, ctx){
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < imgData.data.length; i += 4) {
+        let grayscale = (0.2126 * imgData.data[i]) + 
+                        (0.7152 * imgData.data[i + 1]) + 
+                        (0.0722 * imgData.data[i + 2]);
+
+        imgData.data[i] = imgData.data[i + 1] = imgData.data[i + 2] = grayscale;
+        imgData.data[i + 3] = 255;
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    return imgData;
+}
+
 // capture the image input by user
 
 const fileInput = document.getElementById('file');
@@ -24,19 +49,20 @@ convertButton.addEventListener('click', function() {
         let reader = new FileReader();
         reader.onload = function (e) {
             let img = document.createElement("img");
-            img.onload = function (event) {
+            img.onload = function () {
                 // Dynamically create a canvas element
                 let canvas = document.createElement("canvas");
-
-                // let canvas = document.getElementById("canvas");
                 let ctx = canvas.getContext("2d");
+
+                // Set canvas dimensions
+                canvas.width = 300;
+                canvas.height = 150;    
 
                 // Actual resizing
                 img.width = 300;
                 img.height = 150;
-                ctx.drawImage(img, 0, 0, 300, 150);
 
-                // Show resized image in preview element
+                convertImageToGrayscale(img, canvas, ctx);
                 let dataurl = canvas.toDataURL(file.type);
                 document.getElementById("ascii").src = dataurl;
             }
