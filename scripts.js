@@ -2,13 +2,16 @@
 let scale = 0.5;
 let brightness = 1;
 let contrast = 1;
+let invertionBool = false;
 let rotate = 0;
+let renderAscii = false;
 
 // HTML elements that hold the values
 const scaleSlider = document.getElementById('scale');
 const brightnessSlider = document.getElementById('brightness');
 const contrastSlider = document.getElementById('contrast');
 const rotateDropdown = document.getElementById('rotate');
+const invertCheckbox = document.getElementById('inverted');
 
 // -- CHANGE SLIDER VALUES --
 
@@ -17,6 +20,8 @@ const scaleValue = document.getElementById('scaleValue');
 
 scaleSlider.addEventListener('input', function() {
     scaleValue.innerText = scaleSlider.value;
+    scale = scaleSlider.value; // Update the global scale variable`
+    renderAscii = true;
 });
 
 // BRIGHTNESS SLIDER
@@ -24,6 +29,8 @@ const brightnessValue = document.getElementById('brightnessValue');
 
 brightnessSlider.addEventListener('input', function() {
     brightnessValue.innerText = brightnessSlider.value;
+    brightness = brightnessSlider.value; // Update the global brightness variable
+    renderAscii = true;
 });
 
 // CONTRAST SLIDER
@@ -31,6 +38,25 @@ const contrastValue = document.getElementById('contrastValue');
 
 contrastSlider.addEventListener('input', function() {
     contrastValue.innerText = contrastSlider.value;
+    contrast = contrastSlider.value; // Update the global contrast variable
+    renderAscii = true;
+});
+
+// ROTATE DROPDOWN
+const rotateValue = document.getElementById('rotateValue');
+
+rotateDropdown.addEventListener('change', function() {
+    rotateValue.innerText = rotateDropdown.value;
+    rotate = rotateDropdown.value; // Update the global rotate variable
+    renderAscii = true;
+});
+
+// INVERT CHECKBOX
+const invertValue = document.getElementById('invertValue');
+
+invertCheckbox.addEventListener('change', function() {
+    invertionBool = invertCheckbox.checked; // Update the global invertionBool variable
+    renderAscii = true;
 });
 
 // Capture input elements
@@ -95,11 +121,12 @@ function returnAsciiFromBrightness(brightness){
 }
 
 /**
- * Get a 2D array of brightness values from the image data
- * @param {ImageData} imgData - The image data object containing pixel color values
- * @param {number} width - The width of the image
- * @param {number} height - The height of the image
- * @returns {Array} - 2D array representing pixel brightness values
+ * Converts image data to a 2D array of brightness values.
+ *
+ * @param {ImageData} imgData - The image data object containing pixel data.
+ * @param {number} width - The width of the image.
+ * @param {number} height - The height of the image.
+ * @returns {number[][]} A 2D array where each element represents the brightness of a pixel.
  */
 function get2DArrayOfBrightness(imgData, width, height) {
     let brightnessData = [];
@@ -117,6 +144,73 @@ function get2DArrayOfBrightness(imgData, width, height) {
     }
 
     return brightnessData;
+}
+
+/**
+ * Modifies the brightness of the given brightness data by a specified brightness value.
+ *
+ * @param {number[][]} brightnessData - A 2D array representing the brightness values of an image.
+ * @param {number} brightnessValue - The value by which to modify the brightness. 
+ *                                    Values greater than 1 will increase brightness, 
+ *                                    values between 0 and 1 will decrease brightness.
+ * @returns {number[][]} A new 2D array with the modified brightness values, clamped between 0 and 255.
+ */
+function modifyBrightness(brightnessData, brightnessValue) {
+    let newBrightnessData = [];
+
+    for (let row = 0; row < brightnessData.length; row++) {
+        let newBrightnessRow = [];
+        for (let col = 0; col < brightnessData[row].length; col++) {
+            let newBrightness = brightnessData[row][col] * brightnessValue;
+            newBrightness = Math.min(255, Math.max(0, newBrightness)); // Clamp the value between 0 and 255
+            newBrightnessRow.push(newBrightness);
+        }
+        newBrightnessData.push(newBrightnessRow);
+    }
+
+    return newBrightnessData;   
+}
+
+/**
+ * Modifies the contrast of a given grayscale image data.
+ *
+ * @param {number[][]} imageData - A 2D array representing the grayscale values of the image.
+ * @param {number} contrastValue - The contrast adjustment value. Values > 1 increase contrast, values < 1 decrease contrast.
+ * @returns {number[][]} A new 2D array with the contrast-adjusted grayscale values.
+ */
+function modifyContrast(imageData, contrastValue) {
+    let newContrastData = [];
+    const midpoint = 128; // midpoint for grayscale images
+
+    for (let row = 0; row < imageData.length; row++) {
+        let newContrastRow = [];
+        for (let col = 0; col < imageData[row].length; col++) {
+            let newContrast = midpoint + (imageData[row][col] - midpoint) * contrastValue; // formula for contrast
+            newContrast = Math.min(255, Math.max(0, newContrast)); // Clamp the value between 0 and 255
+            newContrastRow.push(newContrast);
+        }
+        newContrastData.push(newContrastRow);
+    } 
+    return newContrastData;
+}
+
+/**
+ * Inverts the colors of the given image data if the invertionBool is true.
+ *
+ * @param {ImageData} imageData - The image data to be inverted.
+ * @param {boolean} invertionBool - A boolean indicating whether to invert the image data.
+ * @returns {ImageData} The modified image data with inverted colors if invertionBool is true.
+ */
+function invert(imageData, invertionBool) {
+    if (invertionBool) { // if checked, invert the image data
+        for (let pixelIndex = 0; pixelIndex < imageData.data.length; pixelIndex += 4) {
+            imageData.data[pixelIndex] = 255 - imageData.data[pixelIndex];     // Red
+            imageData.data[pixelIndex + 1] = 255 - imageData.data[pixelIndex + 1]; // Green
+            imageData.data[pixelIndex + 2] = 255 - imageData.data[pixelIndex + 2]; // Blue
+            // Alpha channel remains unchanged
+        }
+    }
+    return imageData; // Return the modified imageData
 }
 
 /**
@@ -149,14 +243,11 @@ function displayAsciiArray(asciiArray) {
     outputContainer.innerText = asciiArt; // Set the ASCII art as the inner text of the container
 }
 
-// Event listener for the Convert button
-convertButton.addEventListener('click', function() {
+function makeTheAscii(){
     if (!uploadedFile) {
         alert("Please upload a file before clicking Convert.");
         return;
     }
-
-    scale
 
     const reader = new FileReader(); // Initialize FileReader to read the image file
     reader.onload = function(e) {
@@ -165,9 +256,8 @@ convertButton.addEventListener('click', function() {
             const originalWidth = img.width;
             const originalHeight = img.height;
 
-            // Set the new dimensions (half the original size)
-            const newWidth = Math.floor(originalWidth / 2);
-            const newHeight = Math.floor(originalHeight / 2);
+            const newWidth = Math.floor(originalWidth / (1 / scale));
+            const newHeight = Math.floor(originalHeight / (1 / scale));
 
             // Create a canvas to downscale the image
             const canvas = document.createElement('canvas');
@@ -179,7 +269,12 @@ convertButton.addEventListener('click', function() {
             ctx.drawImage(img, 0, 0, newWidth, newHeight);
 
             // Convert the image to grayscale
-            const imgData = ctx.getImageData(0, 0, newWidth, newHeight);
+            let imgData = ctx.getImageData(0, 0, newWidth, newHeight);
+
+            // Invert the image data if the user wants to
+            imgData = invert(imgData, invertionBool);
+
+            // Convert the image to grayscale
             for (let i = 0; i < imgData.data.length; i += 4) {
                 const grayscale = (0.2126 * imgData.data[i]) + 
                                   (0.7152 * imgData.data[i + 1]) + 
@@ -190,15 +285,19 @@ convertButton.addEventListener('click', function() {
             }
 
             // Get the pixel brightness data from the grayscale image
-            const brightnessData = get2DArrayOfBrightness(imgData, newWidth, newHeight);
+            let modifiedImageData = get2DArrayOfBrightness(imgData, newWidth, newHeight);
+
+            // Add the user brightness modification
+            modifiedImageData = modifyBrightness(modifiedImageData, brightness);
+
+            // Add the user contrast modification
+            modifiedImageData = modifyContrast(modifiedImageData, contrast);
 
             // Convert the brightness data to ASCII characters
-            const asciiArray = convertToAscii(brightnessData);
+            const asciiArray = convertToAscii(modifiedImageData);
 
             // Display the ASCII art in the output container
             displayAsciiArray(asciiArray);
-
-            // No need to display the image now
         };
         img.onerror = function() {
             alert("Failed to load image.");
@@ -206,4 +305,21 @@ convertButton.addEventListener('click', function() {
         img.src = e.target.result; // Set the image source to the uploaded file data
     };
     reader.readAsDataURL(uploadedFile); // Read the uploaded file as a data URL
+}
+
+// Event listener for the Convert button
+convertButton.addEventListener('click', function() {
+    renderAscii = true;
 });
+
+// "Render loop"
+function renderLoop() {
+    if (renderAscii) {
+        makeTheAscii();
+        renderAscii = false;
+    }
+    requestAnimationFrame(renderLoop);
+}
+
+// Start the render loop
+requestAnimationFrame(renderLoop);
