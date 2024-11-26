@@ -1,76 +1,69 @@
-/**
- * Converts an image to grayscale.
- *
- * @param {HTMLImageElement} img - The image element to be converted.
- * @param {HTMLCanvasElement} canvas - The canvas element where the image will be drawn.
- * @param {CanvasRenderingContext2D} ctx - The 2D rendering context for the drawing surface of the canvas.
- * @returns {ImageData} The ImageData object containing the grayscale image data.
- */
-function convertImageToGrayscale(img, canvas, ctx){
-    ctx.drawImage(img, 0, 0);
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+// Capture input elements
+const fileInput = document.getElementById('file'); // File input element
+const convertButton = document.getElementById('convert'); // Convert button
+const outputContainer = document.getElementById('ascii'); // Output container for displaying the downscaled image
 
-    for (let i = 0; i < imgData.data.length; i += 4) {
-        let grayscale = (0.2126 * imgData.data[i]) + 
-                        (0.7152 * imgData.data[i + 1]) + 
-                        (0.0722 * imgData.data[i + 2]);
+let uploadedFile = null; // Stores the uploaded file for processing
 
-        imgData.data[i] = imgData.data[i + 1] = imgData.data[i + 2] = grayscale;
-        imgData.data[i + 3] = 255;
-    }
-
-    ctx.putImageData(imgData, 0, 0);
-    return imgData;
-}
-
-// capture the image input by user
-
-const fileInput = document.getElementById('file');
-const convertButton = document.getElementById('convert');
-let fileAdded = false; // bool to check if it was added or not
-let file; // file that the user inputs
-
-// event listener to check for a change (e.g. if a user inputs a file)
+// Event listener to capture the uploaded file
 fileInput.addEventListener('change', function(event) {
-    file = event.target.files[0];
-    // set the fileAdded flag to true
-    if (file) {
-        fileAdded = true;
+    uploadedFile = event.target.files[0]; // Get the selected file
+    if (!uploadedFile) {
+        alert("No file selected. Please upload an image.");
+        return;
     }
-    else {
-        fileAdded = false;
-    }
+    console.log('File selected:', uploadedFile.name);
 });
 
-// what happens after the user clicks on the convert button
+// Event listener for the Convert button
 convertButton.addEventListener('click', function() {
-    // check if a file has been added, if it wasn't, alert the user
-    if (fileAdded){
-        let reader = new FileReader();
-        reader.onload = function (e) {
-            let img = document.createElement("img");
-            img.onload = function () {
-                // Dynamically create a canvas element
-                let canvas = document.createElement("canvas");
-                let ctx = canvas.getContext("2d");
+    if (!uploadedFile) {
+        alert("Please upload a file before clicking Convert.");
+        return;
+    }
 
-                // Set canvas dimensions
-                canvas.width = 300;
-                canvas.height = 150;    
+    const reader = new FileReader(); // Initialize FileReader to read the image file
+    reader.onload = function(e) {
+        const img = new Image(); // Create a new image object
+        img.onload = function() {
+            const originalWidth = img.width;
+            const originalHeight = img.height;
 
-                // Actual resizing
-                img.width = 300;
-                img.height = 150;
+            // Set the new dimensions (half the original size)
+            const newWidth = Math.floor(originalWidth / 2);
+            const newHeight = Math.floor(originalHeight / 2);
 
-                convertImageToGrayscale(img, canvas, ctx);
-                let dataurl = canvas.toDataURL(file.type);
-                document.getElementById("ascii").src = dataurl;
+            // Create a canvas to downscale the image
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+
+            // Draw the downscaled image onto the canvas
+            ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+            // Convert the image to grayscale
+            const imgData = ctx.getImageData(0, 0, newWidth, newHeight);
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                const grayscale = (0.2126 * imgData.data[i]) + 
+                                  (0.7152 * imgData.data[i + 1]) + 
+                                  (0.0722 * imgData.data[i + 2]);
+
+                imgData.data[i] = imgData.data[i + 1] = imgData.data[i + 2] = grayscale;
+                // Alpha channel remains unchanged
             }
-            img.src = e.target.result;
-        }
-        reader.readAsDataURL(file);
-    }
-    else{
-        alert("Select a file before proceeding!");
-    }
+            ctx.putImageData(imgData, 0, 0);
+
+            // Generate the downscaled image as a data URL
+            const dataUrl = canvas.toDataURL('image/png');
+
+            // Display the resulting image in the "ascii" container
+            outputContainer.innerHTML = ''; // Clear previous content
+            const resultImg = document.createElement('img');
+            resultImg.src = dataUrl;
+            outputContainer.appendChild(resultImg);
+        };
+        img.src = e.target.result; // Set the image source to the uploaded file data
+    };
+    reader.readAsDataURL(uploadedFile); // Read the uploaded file as a data URL
 });
