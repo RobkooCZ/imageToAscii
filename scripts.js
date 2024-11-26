@@ -1,3 +1,38 @@
+// Global variables to hold user's modification choices
+let scale = 0.5;
+let brightness = 1;
+let contrast = 1;
+let rotate = 0;
+
+// HTML elements that hold the values
+const scaleSlider = document.getElementById('scale');
+const brightnessSlider = document.getElementById('brightness');
+const contrastSlider = document.getElementById('contrast');
+const rotateDropdown = document.getElementById('rotate');
+
+// -- CHANGE SLIDER VALUES --
+
+// SCALE SLIDER
+const scaleValue = document.getElementById('scaleValue');
+
+scaleSlider.addEventListener('input', function() {
+    scaleValue.innerText = scaleSlider.value;
+});
+
+// BRIGHTNESS SLIDER
+const brightnessValue = document.getElementById('brightnessValue');
+
+brightnessSlider.addEventListener('input', function() {
+    brightnessValue.innerText = brightnessSlider.value;
+});
+
+// CONTRAST SLIDER
+const contrastValue = document.getElementById('contrastValue');
+
+contrastSlider.addEventListener('input', function() {
+    contrastValue.innerText = contrastSlider.value;
+});
+
 // Capture input elements
 const fileInput = document.getElementById('file'); // File input element
 const convertButton = document.getElementById('convert'); // Convert button
@@ -120,6 +155,8 @@ convertButton.addEventListener('click', function() {
         alert("Please upload a file before clicking Convert.");
         return;
     }
+
+    scale
 
     const reader = new FileReader(); // Initialize FileReader to read the image file
     reader.onload = function(e) {

@@ -8,13 +8,56 @@
     <script src="scripts.js" defer></script>
 </head>
 <body>
-    <h1>IMAGE TO ASCII CONVERTOR</h1> 
     <div class="main">
-        <h2>Upload Image (.png, .jpeg, .jpg, .gif)</h2>
-        <input type="file" id="file" accept="image/png, image/jpeg, image/jpg, image/gif">
-        <button id="convert">Convert</button>
-        <h2>ASCII:</h2>
-        <pre id="ascii"></pre>
+        <h1>IMAGE TO ASCII CONVERTOR</h1>
+        <div class="idk">
+            <div class="leftSide">
+                <div class="upload">
+                    <h2>Upload Image (.png, .jpeg, .jpg, .gif)</h2>
+                    <input type="file" id="file" accept="image/png, image/jpeg, image/jpg, image/gif">
+                </div>
+                <div class="settings">
+                    <h2>Settings</h2>
+                    <div class="settingsContainer">
+                        <div class="setting">
+                            <label for="scale">Scale:</label>
+                            <input type="range" id="scale" step="0.1" name="scale" min="0" max="1" value="0.5">
+                            <span id="scaleValue">0.5</span>
+                        </div>
+                        <div class="setting">
+                            <label for="brightness">Brightness:</label>
+                            <input type="range" id="brightness" step="0.1" name="brightness" min="0" max="2" value="1">
+                            <span id="brightnessValue">1</span>
+                        </div>
+                        <div class="setting">
+                            <label for="contrast">Contrast:</label>
+                            <input type="range" id="contrast" step="0.1" name="contrast" min="0" max="2" value="1">
+                            <span id="contrastValue">1</span>
+                        </div>
+                        <div class="setting">
+                            <label for="inverted">Invert?</label>
+                            <input type="checkbox" id="inverted">
+                        </div>
+                        <div class="setting">
+                            <label for="rotate">Rotate by:</label>
+                            <select id="rotate">
+                                <option value="0">0°</option>
+                                <option value="90">90°</option>
+                                <option value="180">180°</option>
+                                <option value="270">270°</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="convert">
+                    <button id="convert">Convert</button>
+                </div>
+            </div>
+            <div class="ASCII">
+                <h2>ASCII:</h2>
+                <pre id="ascii"></pre>
+            </div>
+        </div>
     </div>
 </body>
 </html>

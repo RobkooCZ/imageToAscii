@@ -1,27 +1,101 @@
 body, html {
     height: 100%;
     margin: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
     background-color: #121212;
     color: white;
+}
+
+body{
+    overflow-x: hidden;
 }
 
 .main { 
     display: flex;
     flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+h1{
+    text-align: center;
+}
+
+.idk{
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 90%;
+    border-radius: 8px;
+}
+
+.leftSide{
+    border-right: 1px solid white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.ASCII{
+    padding-left: 1px;
+    & h2{
+        text-align: center;
+    }
+    & pre{
+        background-color: #222;
+        color: #fff;
+        margin-left: 1vh;
+        margin-right: 1vh;
+        padding: 1vh;
+        font-size: 2px;
+        border-radius: 4px;
+        width: auto;
+        max-width: 100%;
+        overflow: auto;
+        font-family: monospace;
+        text-align: center;
+    }
+}
+
+.upload{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 45%;
+    border-bottom: 1px solid white;
+}
+
+.settings{
+    height: 45%;
+    display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    width: 40vw;
-    max-width: 600px;
-    padding: 2rem;
-    background-color: #1f1f1f;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.5S);
-    text-align: center;
-    border: white 1px solid;
+    & h2{
+        text-align: center;
+    }
+
+    & .setting{
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        margin: 1vh;
+        & label{
+            margin-right: 1vh;
+        }
+    }
+}
+
+.convert{
+    border-top: 1px solid white;
+    height: 10%;
+}
+
+.leftSide, .ASCII {
+    width: 50%;
+    height: 100%;
 }
 
 h2 {
@@ -54,15 +128,4 @@ button {
 
 button:hover {
     background-color: #444;
-}
-
-pre {
-    background-color: #222;
-    color: #fff;
-    padding: 1rem;
-    border-radius: 4px;
-    max-height: 300px;
-    overflow-y: auto;
-    width: 100%;
-    font-family: monospace;
 }
