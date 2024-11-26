@@ -18,11 +18,14 @@
                 </div>
                 <div class="settings">
                     <h2>Settings</h2>
+                    <div id="notAddedFile">
+                        <h2>ADD A FILE BEFORE MODIFYING SETTINGS!</h2>
+                    </div>
                     <div class="settingsContainer">
                         <div class="setting">
                             <label for="scale">Scale:</label>
-                            <input type="range" id="scale" step="0.1" name="scale" min="0.1" max="1" value="0.5">
-                            <span id="scaleValue">0.5</span>
+                            <input type="range" id="scale" step="0.1" name="scale" min="0.1" max="2" value="1">
+                            <span id="scaleValue">1</span>
                         </div>
                         <div class="setting">
                             <label for="brightness">Brightness:</label>
@@ -50,12 +53,18 @@
                     </div>
                 </div>
                 <div class="convert">
-                    <button id="convert">Convert</button>
+                    <button id="convert">Add a file to convert!</button>
                 </div>
             </div>
             <div class="ASCII">
-                <h2>ASCII:</h2>
-                <pre id="ascii"></pre>
+                <div class="ASCIIContainer">
+                    <h2>ASCII:</h2>
+                    <pre id="ascii"></pre>
+                </div>
+                <div class="asciiButtons">
+                    <button id="download">Convert a file to download!</button>
+                    <button id="clipboard">Convert a file to copy into cliboard!</button>
+                </div>
             </div>
         </div>
     </div>
