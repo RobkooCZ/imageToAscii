@@ -9,7 +9,7 @@
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
-    <div class="main">
+    <div class="main" id="main">
         <h1>IMAGE TO ASCII CONVERTOR</h1>
         <div class="idk">
             <div class="leftSide">
@@ -51,6 +51,17 @@
                                 <option value="270">270°</option>
                             </select>
                         </div>
+                        <div class="setting">
+                            <label for="characterSet">Character set:</label>
+                            <select id="characterSet">
+                                <option value="classic">Classic</option>
+                                <option value="binary">Binary</option>
+                                <option value="gradient">Gradient</option>
+                                <option value="dense">Dense</option>
+                                <option value="stylized">Stylized</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="convert">
@@ -68,6 +79,14 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="customCharacterSetContainer">
+        <button id="x">X</button>
+        <h2>Custom Character Set</h2>
+        <h3>Characters go from darkest to lowest. Only unique characters allowed.</h3>
+        <textarea id="customCharacterSet"></textarea>
+        <button id="saveCustomCharacterSet">At least 2 characters are required to save.</button>
     </div>
 </body>
 </html>

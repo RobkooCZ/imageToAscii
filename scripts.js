@@ -1,3 +1,58 @@
+// --- HANDLE CUSTOM CHARACTER SET INPUT ---    
+const customCharacterSetInput = document.getElementById('customCharacterSet'); // TEXT AREAs
+
+let currentAddedLetter;
+let userSet;
+let letterCount;
+let canSave = false; // bool to check if user can save their custom set
+
+const main = document.getElementById('main');
+const customCharacterSetContainer = document.getElementById('customCharacterSetContainer');
+const saveButton = document.getElementById('saveCustomCharacterSet');
+const xButton = document.getElementById('x');
+
+customCharacterSetInput.addEventListener('input', function() {
+    let userSet = customCharacterSetInput.value;
+    let uniqueSet = '';
+
+    for (let i = 0; i < userSet.length; i++) {
+        if (!uniqueSet.includes(userSet[i]) && userSet[i] !== ' ') {
+            uniqueSet += userSet[i];
+        }
+    }
+
+    customCharacterSetInput.value = uniqueSet; // Update the input field with the unique characters
+    let letterCount = uniqueSet.length;
+
+    if (letterCount < 2){
+        canSave = false;
+        saveButton.innerText = 'At least 2 characters are required to save.';
+        saveButton.classList.remove('canSave');
+    }
+    else {
+        canSave = true;
+        saveButton.innerText = 'Save';
+        saveButton.classList.add('canSave');
+    }
+});
+
+xButton.addEventListener('click', function() {
+    main.classList.remove('fade');
+    customCharacterSetContainer.classList.remove('active');
+    characterSetDropdown.value = 'classic';
+    characterSet = '@%#*+=-:. ';
+    if (firstRender) renderAscii = true;
+});
+
+saveButton.addEventListener('click', function(){
+    if (!canSave) return;
+    characterSet = customCharacterSetInput.value;
+    main.classList.remove('fade');
+    customCharacterSetContainer.classList.remove('active');
+    characterSetDropdown.value = 'custom';
+    if (firstRender) renderAscii = true;
+});
+
 // Global variables to hold user's modification choices
 let scale = 0.5;
 let brightness = 1;
@@ -6,6 +61,8 @@ let invertionBool = false;
 let rotate = 0;
 let renderAscii = false;
 let firstRender = false; // Variable to check if it's the first render
+let characterSet = '@%#*+=-:. '; // Variable to hold the character set
+let userCharacterSetChoice = 'classic'; // hold the choice of the user
 
 // HTML elements that hold the values
 const scaleSlider = document.getElementById('scale');
@@ -13,6 +70,7 @@ const brightnessSlider = document.getElementById('brightness');
 const contrastSlider = document.getElementById('contrast');
 const rotateDropdown = document.getElementById('rotate');
 const invertCheckbox = document.getElementById('inverted');
+const characterSetDropdown = document.getElementById('characterSet');
 
 // -- CHANGE SLIDER VALUES --
 
@@ -59,6 +117,37 @@ invertCheckbox.addEventListener('change', function() {
     if (firstRender) renderAscii = true;
 });
 
+// CHARACTER SET DROPDOWN
+const characterSetValue = document.getElementById('characterSetValue');
+
+characterSetDropdown.addEventListener('change', function() {
+    switch (characterSetDropdown.value){
+        case 'classic':
+            characterSet = '@%#*+=-:. ';
+            break;
+        case 'binary':
+            characterSet = '10 ';
+            break;
+        case 'gradient':
+            characterSet = '█▓▒░';
+            break;
+        case 'dense':
+            characterSet = '@#$%&8BWM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,"^.';
+            break;
+        case 'stylized':
+            characterSet = '█▇▆▅▄▃▂▁';
+            break;
+        case 'custom':
+            customCharacterSetContainer.classList.add('active');
+            main.classList.add('fade');
+            break
+        default:
+            characterSet = '@%#*+=-:. ';
+            break;
+    }
+    if (firstRender) renderAscii = true;
+});
+
 // Capture input elements
 const fileInput = document.getElementById('file'); // File input element
 const convertButton = document.getElementById('convert'); // Convert button
@@ -96,51 +185,20 @@ fileInput.addEventListener('change', function(event) {
     setTimeout(function() {
         convertButton.classList.add('active');
         notAddedFile.classList.add('active');
-        downloadButton.classList.add('active');
         convertButton.innerHTML = 'Convert!';
     }, 10); // Small delay to trigger transitions together
 });
 
+
 /**
- * Convert brightness values to ASCII characters
+ * Convert a brightness value to ASCII character
  * @param {number} brightness - The brightness value of a pixel (0-255)
+ * @param {Array} characterSet - The set of characters to choose from
  * @returns {string} - The corresponding ASCII character for the brightness
  */
-function returnAsciiFromBrightness(brightness){
-    let ascii;
-
-    if (brightness >= 0 && brightness <= 25){
-        ascii = '@';
-    }
-    else if (brightness >= 26 && brightness <= 50){
-        ascii = '%';
-    }
-    else if (brightness >= 51 && brightness <= 75){
-        ascii = '#';
-    }
-    else if (brightness >= 76 && brightness <= 100){
-        ascii = '*';
-    }
-    else if (brightness >= 101 && brightness <= 125){
-        ascii = '+';
-    }
-    else if (brightness >= 126 && brightness <= 150){
-        ascii = '=';
-    }
-    else if (brightness >= 151 && brightness <= 175){
-        ascii = '-';
-    }
-    else if (brightness >= 176 && brightness <= 200){
-        ascii = ':';
-    }
-    else if (brightness >= 201 && brightness <= 225){
-        ascii = '.';
-    }
-    else {
-        ascii = ' ';
-    }
-
-    return ascii;
+function brightnessToCharacter(brightness, characterSet){
+    let index = Math.round(brightness / 255 * (characterSet.length - 1));
+    return characterSet[index];
 }
 
 /**
@@ -274,14 +332,14 @@ function rotateCanvas(ctx, canvas, img, angle, newWidth, newHeight) {
  * @param {Array} brightnessData - 2D array containing pixel brightness values
  * @returns {Array} - 2D array of ASCII characters representing the image
  */
-function convertToAscii(brightnessData){
+function convertToAscii(brightnessData, characterSet){
     let asciiData = [];
 
     // Loop through the brightness data and convert to ASCII characters
     for (let row = 0; row < brightnessData.length; row++){ 
         let asciiRow = [];
         for (let col = 0; col < brightnessData[row].length; col++){ 
-            const asciiChar = returnAsciiFromBrightness(brightnessData[row][col]); // Get ASCII for brightness
+            const asciiChar = brightnessToCharacter(brightnessData[row][col], characterSet); // Get ASCII for brightness
             asciiRow.push(asciiChar); // Add the ASCII character to the row
         }
         asciiData.push(asciiRow); // Add the row of ASCII characters to the main data
@@ -363,7 +421,7 @@ function makeTheAscii() {
             modifiedImageData = modifyContrast(modifiedImageData, contrast);
 
             // Convert brightness data to ASCII characters
-            const asciiArray = convertToAscii(modifiedImageData);
+            const asciiArray = convertToAscii(modifiedImageData, characterSet);
 
             // Display the ASCII art in the output container
             displayAsciiArray(asciiArray);
