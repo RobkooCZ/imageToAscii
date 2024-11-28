@@ -176,6 +176,10 @@ h2 {
     border-top: 1px solid white;
     height: 10%;
     overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
 }
 
 .asciiButtons {
