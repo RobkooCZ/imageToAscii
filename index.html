@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Convertor</title>
     <link rel="stylesheet" type="text/css" href="style.css">
-    <script src="scripts.js" defer></script>
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -15,7 +14,8 @@
             <div class="leftSide">
                 <div class="upload">
                     <h2>Upload Image (.png, .jpeg, .jpg, .gif)</h2>
-                    <input type="file" id="file" accept="image/png, image/jpeg, image/jpg, image/gif">
+                    <input type="file" id="file" accept="image/png, image/jpeg, image/jpg" style="display: none;">
+                    <label for="file" id="fileLabel" class="fileLabel">SELECT A FILE</label>
                 </div>
                 <div class="settings">
                     <h2>Settings</h2>
@@ -24,17 +24,17 @@
                     </div>
                     <div class="settingsContainer">
                         <div class="setting">
-                            <label for="scale">Scale:</label>
+                            <label for="scale">Scale Multipler:</label>
                             <input type="range" id="scale" step="0.1" name="scale" min="0.1" max="2" value="1">
                             <span id="scaleValue">1</span>
                         </div>
                         <div class="setting">
-                            <label for="brightness">Brightness:</label>
+                            <label for="brightness">Brightness Multipler:</label>
                             <input type="range" id="brightness" step="0.1" name="brightness" min="0" max="2" value="1">
                             <span id="brightnessValue">1</span>
                         </div>
                         <div class="setting">
-                            <label for="contrast">Contrast:</label>
+                            <label for="contrast">Contrast Multipler:</label>
                             <input type="range" id="contrast" step="0.1" name="contrast" min="0" max="2" value="1">
                             <span id="contrastValue">1</span>
                         </div>
@@ -50,6 +50,16 @@
                                 <option value="180">180°</option>
                                 <option value="270">270°</option>
                             </select>
+                        </div>
+                        <div class="setting">
+                            <label for="widthMultiplier">Width Multipler:</label>
+                            <input type="range" id="widthMultiplier" step="0.1" name="widthMultiplier" min="0.1" max="2" value="1">
+                            <span id="widthValue">1</span>
+                        </div>
+                        <div class="setting">
+                            <label for="heightMultiplier">Height Multipler:</label>
+                            <input type="range" id="heightMultiplier" step="0.1" name="heightMultiplier" min="0.1" max="2" value="1">
+                            <span id="heightValue">1</span>
                         </div>
                         <div class="setting">
                             <label for="characterSet">Character set:</label>
@@ -88,5 +98,6 @@
         <textarea id="customCharacterSet"></textarea>
         <button id="saveCustomCharacterSet">At least 2 characters are required to save.</button>
     </div>
+    <script src="scripts.js" defer></script>
 </body>
 </html>

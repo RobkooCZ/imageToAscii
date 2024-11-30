@@ -63,11 +63,15 @@ let renderAscii = false;
 let firstRender = false; // Variable to check if it's the first render
 let characterSet = '@%#*+=-:. '; // Variable to hold the character set
 let userCharacterSetChoice = 'classic'; // hold the choice of the user
+let width = 1;
+let height = 1;
 
 // HTML elements that hold the values
 const scaleSlider = document.getElementById('scale');
 const brightnessSlider = document.getElementById('brightness');
 const contrastSlider = document.getElementById('contrast');
+const widthSlider = document.getElementById('widthMultiplier');
+const heightSlider = document.getElementById('heightMultiplier');
 const rotateDropdown = document.getElementById('rotate');
 const invertCheckbox = document.getElementById('inverted');
 const characterSetDropdown = document.getElementById('characterSet');
@@ -89,6 +93,24 @@ const brightnessValue = document.getElementById('brightnessValue');
 brightnessSlider.addEventListener('input', function() {
     brightnessValue.innerText = brightnessSlider.value;
     brightness = brightnessSlider.value; // Update the global brightness variable
+    if (firstRender) renderAscii = true;
+});
+
+// WIDTH SLIDER
+const widthValue = document.getElementById('widthValue');
+
+widthSlider.addEventListener('input', function() {
+    widthValue.innerText = widthSlider.value;
+    width = widthSlider.value; // Update the global width variable
+    if (firstRender) renderAscii = true;
+});
+
+// HEIGHT SLIDER
+const heightValue = document.getElementById('heightValue');
+
+heightSlider.addEventListener('input', function() {
+    heightValue.innerText = heightSlider.value;
+    height = heightSlider.value; // Update the global height variable
     if (firstRender) renderAscii = true;
 });
 
@@ -120,7 +142,9 @@ invertCheckbox.addEventListener('change', function() {
 // CHARACTER SET DROPDOWN
 const characterSetValue = document.getElementById('characterSetValue');
 
+// listen for changes in the dropdown
 characterSetDropdown.addEventListener('change', function() {
+    // based on what the user clicks on, set the character set
     switch (characterSetDropdown.value){
         case 'classic':
             characterSet = '@%#*+=-:. ';
@@ -145,13 +169,14 @@ characterSetDropdown.addEventListener('change', function() {
             characterSet = '@%#*+=-:. ';
             break;
     }
-    if (firstRender) renderAscii = true;
+    if (firstRender) renderAscii = true; // only re-render if the user has already pressed the convert button
 });
 
 // Capture input elements
 const fileInput = document.getElementById('file'); // File input element
 const convertButton = document.getElementById('convert'); // Convert button
 const outputContainer = document.getElementById('ascii'); // Output container for displaying ASCII art
+const fileLabel = document.getElementById('fileLabel'); // Label to display the file name
 
 let uploadedFile = null; // Stores the uploaded file for processing
 
@@ -160,12 +185,8 @@ const notAddedFile = document.getElementById('notAddedFile');
 const downloadButton = document.getElementById('download');
 const clipboardButton = document.getElementById('clipboard');
 
-/**
- * Event listener to capture the uploaded file
- */
-fileInput.addEventListener('change', function(event) {
-    uploadedFile = event.target.files[0]; // Get the selected file
-    if (!uploadedFile) {
+function handleImage(blob, name){
+    if (!blob || !blob.type.startsWith('image/')) {
         // Remove 'active' class with a slight delay to sync transitions
         setTimeout(function() {
             convertButton.classList.remove('active');
@@ -176,19 +197,43 @@ fileInput.addEventListener('change', function(event) {
             downloadButton.innerHTML = 'Convert a file to download!';
             convertButton.innerHTML = 'Add a file to convert!';
             clipboardButton.innerHTML = 'Convert a file to copy into cliboard!';
+            fileLabel.innerText = 'SELECT A FILE';
 
         }, 10); // Small delay to trigger transitions together
+        console.error('Invalid file type. Please upload an image file.');
         return;
     }
+    else{
+        const fileName = name;
+        // Add 'active' class with a slight delay to sync transitions
+        setTimeout(function() {
+            fileLabel.innerText = fileName;
+            convertButton.classList.add('active');
+            notAddedFile.classList.add('active');
+            convertButton.innerHTML = 'Convert!';
+        }, 10); // Small delay to trigger transitions
+    }
 
-    // Add 'active' class with a slight delay to sync transitions
-    setTimeout(function() {
-        convertButton.classList.add('active');
-        notAddedFile.classList.add('active');
-        convertButton.innerHTML = 'Convert!';
-    }, 10); // Small delay to trigger transitions together
+    return blob;
+}
+
+document.addEventListener('paste', function(event) {
+    const items = event.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            const name = blob.name || 'Pasted Image'; // Assign a default name if not available
+            blob.name = name; 
+            uploadedFile = handleImage(blob, name);
+        }
+    }
 });
 
+fileInput.addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    const name = file.name || 'Uploaded Image'; // Use the file name or a default name
+    uploadedFile = handleImage(file, name);
+});
 
 /**
  * Convert a brightness value to ASCII character
@@ -389,8 +434,8 @@ function makeTheAscii() {
             const originalHeight = img.height;
 
             // Scale the image based on the user's scale choice
-            const newWidth = Math.floor(originalWidth * (scale / 3));
-            const newHeight = Math.floor(originalHeight * (scale / 3));
+            const newWidth = Math.floor(originalWidth * (scale / 3) * width);
+            const newHeight = Math.floor(originalHeight * (scale / 3) * height);
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
