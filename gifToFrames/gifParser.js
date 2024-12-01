@@ -59,7 +59,6 @@ function getLogicalScreenDescriptor(arrayBuffer) {
 function extractGlobalColorTable(arrayBuffer, colorCount){
     const lenghtInBytes = colorCount * 3; // 3 bytes per color
     const bytes = new Uint8Array(arrayBuffer).slice(13, 13 + lenghtInBytes); // Get the next n bytes
-    let currentPixelIndex = 0;
     let globalColorTable = [];
 
     for (let i = 0; i < bytes.length; i += 3) {
@@ -77,5 +76,83 @@ function extractGlobalColorTable(arrayBuffer, colorCount){
         // Add the color to the globalColorTable
         globalColorTable.push(color);
     }
-    return globalColorTable;
+    return {
+        globalColorTable,
+        nextByteIndex: 13 + lenghtInBytes
+    };
+}
+
+function readCurrentByte(arrayBuffer, nextByteIndex) {
+    // Ensure the index is within the bounds of the arrayBuffer
+    if (nextByteIndex < 0 || nextByteIndex >= arrayBuffer.byteLength) {
+        throw new Error("Index out of bounds");
+    }
+
+    const byte = new Uint8Array(arrayBuffer)[nextByteIndex];
+
+    switch (byte) {
+        case 0x3B:
+            // GIF trailer
+            return {
+                byteType: 'Trailer',
+                nextByteIndex: nextByteIndex + 1, // Trailer is at the end of the GIF
+                rawData: null
+            };
+        case 0x21:
+            // Extension block
+            const extensionByte = new Uint8Array(arrayBuffer)[nextByteIndex + 1]; // Get the extension byte to figure out what it is
+            // Identify the extension block type
+            switch (extensionByte){
+                case 0xF9:
+                    // Graphics Control Extension
+                    return {
+                        byteType: 'GraphicControlExtension',
+                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
+                        rawData: null
+                    };
+                case 0xFF:
+                    // Application Extension
+                    return {
+                        byteType: 'ApplicationExtension',
+                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
+                        rawData: null
+                    };
+                case 0xFE:
+                    // Comment Extension
+                    return {
+                        byteType: 'CommentExtension',
+                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
+                        rawData: null
+                    };
+                case 0x01:
+                    // Plain Text Extension
+                    return {
+                        byteType: 'PlainTextExtension',
+                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
+                        rawData: null
+                    };    
+                default:
+                    // Unknown extension block
+                    return {
+                        byteType: 'UnknownExtension',
+                        nextByteIndex: nextByteIndex + 1, // Move past the uknown extension block
+                        rawData: null
+                    };             
+            } 
+            
+        case 0x2C:
+            // Image Descriptor
+            return {
+                byteType: 'ImageDescriptor',
+                nextByteIndex: nextByteIndex + 10, // Skip the next 10 bytes
+                rawData: null
+            };
+        default:
+            // Unknown byte
+            return {
+                byteType: 'Unknown',
+                nextByteIndex: nextByteIndex + 1, // Move to the next byte
+                rawData: [byte]
+            };
+    }
 }
