@@ -2,6 +2,14 @@
 
 This website converts an image to ASCII art based on settings and image inputted by the user.
 
+## Latest Update
+
+- Added a lot of gif parsing functions (not working properly though)
+
+## Plans for the future
+
+- GIF to ascii animation
+
 ## Features
 
 - Convert any image to ASCII art

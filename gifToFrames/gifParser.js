@@ -1,158 +1,448 @@
-function parseGif(arrayBuffer){
-    // Check if the file is a gif
-    if (!checkForGif(arrayBuffer)) {
-        console.error('File is not a gif');
-        return;
-    }
+/**
+ * Parses a GIF file from an ArrayBuffer.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @returns {Object} The parsed GIF data.
+ * @throws {Error} If the file is not a valid GIF.
+ */
+export function parseGif(arrayBuffer) {
+  if (!checkForGif(arrayBuffer)) {
+    throw new Error("Not a valid GIF");
+  }
 
-    // Get the LSD (Logical Screen Descriptor) of the gif
-}
+  // Parse logical screen descriptor
+  const logicalScreenDescriptor = getLogicalScreenDescriptor(arrayBuffer);
 
-function checkForGif(arrayBuffer) {
-    // Get the first 6 bytes of the file
-    const bytes = new Uint8Array(arrayBuffer).slice(0, 6);
-    
-    // Convert the bytes into a string 
-    const header = String.fromCharCode(...bytes); /// the ... basically "spreads" the array into the specific elements
-    
-    // Check if the file is actually a gif
-    if (header === 'GIF89a' || header === 'GIF87a') {
-        return true;
-    } else {
-        return false;
-    }
-}
+  let { globalColorTable, nextByteIndex } = logicalScreenDescriptor.hasGlobalColorTable
+    ? extractGlobalColorTable(arrayBuffer, logicalScreenDescriptor.colorCount)
+    : { globalColorTable: null, nextByteIndex: 13 };
 
-function getLogicalScreenDescriptor(arrayBuffer) {
-    // Get the next 5 bytes of the file starting at byte 6 (LSD)
-    const bytes = new Uint8Array(arrayBuffer).slice(6, 11);
+  const frames = [];
+  const comments = [];
+  const plainTexts = [];
 
-    // Access the flags byte to check if the gif has a global color table
-    const flagBites = bytes[4];
-    const width = bytes[0] | (bytes[1] << 8); // Combine the first two bytes for width
-    const height = bytes[2] | (bytes[3] << 8); // Combine the next two bytes for height
-    const hasGlobalColorTable = (flagBites & 0x80) >> 7; // Global Color Table flag
+  while (nextByteIndex < arrayBuffer.byteLength) {
+    const { byteType, nextByteIndex: updatedIndex } = readCurrentByte(arrayBuffer, nextByteIndex);
 
-    // Initialize colorCount to 0 in case the GIF does not have a Global Color Table
-    let colorCount = 0;
+    switch (byteType) {
+      case "GraphicControlExtension": {
+        const gceData = extractGCEData(arrayBuffer, nextByteIndex);
+        nextByteIndex = gceData.nextByteIndex;
+        frames.push({ gceData });
+        break;
+      }
 
-    // If there is a Global Color Table
-    if (hasGlobalColorTable) {
-        const colorCountBytes = new Uint8Array(arrayBuffer).slice(11, 13); // Get the next 2 bytes
-        const bites1 = colorCountBytes[0];
-        const bites2 = colorCountBytes[1];
+      case "ImageDescriptor": {
+        const imageDescriptor = extractImageDescriptor(arrayBuffer, nextByteIndex);
 
-        const n = bites2 << 8 | bites1; // Combine the two bytes into a 16-bit number
+        let localColorTable = null;
+        if (imageDescriptor.imageFlags.localColorTableFlag) {
+          const lctData = extractLCT(arrayBuffer, imageDescriptor.imageFlags.localColorTableSize, imageDescriptor.nextByteIndex);
+          localColorTable = lctData.colors;
+          nextByteIndex = lctData.nextByteIndex;
+        } else {
+          nextByteIndex = imageDescriptor.nextByteIndex;
+        }
 
-        colorCount = 2 ** (n + 1); // Calculate the number of colors in the GCT
-    }
+        const imageDataBlock = extractImageDataBlock(arrayBuffer, nextByteIndex);
+        frames.push({ imageDescriptor, localColorTable, imageDataBlock });
+        nextByteIndex = imageDataBlock.nextByteIndex;
+        break;
+      }
 
-    // Return the extracted information
-    return {
-        width,
-        height,
-        hasGlobalColorTable,
-        colorCount
-    };
-}
+      case "CommentExtension": {
+        const commentData = extractCommentExtensionData(arrayBuffer, nextByteIndex);
+        comments.push(commentData.comment);
+        nextByteIndex = commentData.nextByteIndex;
+        break;
+      }
 
-function extractGlobalColorTable(arrayBuffer, colorCount){
-    const lenghtInBytes = colorCount * 3; // 3 bytes per color
-    const bytes = new Uint8Array(arrayBuffer).slice(13, 13 + lenghtInBytes); // Get the next n bytes
-    let globalColorTable = [];
+      case "PlainTextExtension": {
+        const plainTextData = extractPlainTextData(arrayBuffer, nextByteIndex);
+        plainTexts.push(plainTextData);
+        nextByteIndex = plainTextData.nextByteIndex;
+        break;
+      }
 
-    for (let i = 0; i < bytes.length; i += 3) {
-        const r = bytes[i];
-        const g = bytes[i + 1];
-        const b = bytes[i + 2];
+      case "ApplicationExtension": {
+        const appData = extractApplicationExtensionData(arrayBuffer, nextByteIndex);
+        // You might want to process application data if needed
+        nextByteIndex = appData.nextByteIndex;
+        break;
+      }
 
-        // Create a new color object
-        const color = {
-            r,
-            g,
-            b
+      case "Trailer": {
+        console.log("End of GIF file");
+        console.log("Frames:", frames.length);
+        console.log("Comments:", comments.length);
+        console.log("Plain texts:", plainTexts.length);
+        console.log("Frame data:", frames);
+        console.log("Comment data:", comments);
+        console.log("Plain text data:", plainTexts);
+        // End of GIF file
+        return {
+          logicalScreenDescriptor,
+          globalColorTable,
+          frames,
+          comments,
+          plainTexts,
         };
+      }
 
-        // Add the color to the globalColorTable
-        globalColorTable.push(color);
+      default: {
+        // Handle unknown or unexpected block types gracefully
+        console.warn("Unknown block type encountered:", byteType);
+        nextByteIndex = updatedIndex;
+        break;
+      }
     }
-    return {
-        globalColorTable,
-        nextByteIndex: 13 + lenghtInBytes
-    };
+  }
+
+  return {
+    logicalScreenDescriptor,
+    globalColorTable,
+    frames,
+    comments,
+    plainTexts,
+  };
 }
 
+/**
+ * Checks if the ArrayBuffer contains a valid GIF header.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @returns {boolean} True if the header is valid, false otherwise.
+ */
+function checkForGif(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer, 0, 6);
+  const header = String.fromCharCode(...bytes);
+  return header === "GIF89a" || header === "GIF87a";
+}
+
+/**
+ * Extracts the logical screen descriptor from the GIF data.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @returns {Object} The logical screen descriptor.
+ */
+function getLogicalScreenDescriptor(arrayBuffer) {
+  const bytes = new DataView(arrayBuffer, 6, 7);
+  const width = bytes.getUint16(0, true);
+  const height = bytes.getUint16(2, true);
+  const flagBites = bytes.getUint8(4);
+  const hasGlobalColorTable = (flagBites & 0x80) >> 7;
+  const colorCount = hasGlobalColorTable ? 2 ** ((flagBites & 0x07) + 1) : 0;
+
+  return {
+    width,
+    height,
+    hasGlobalColorTable,
+    colorCount,
+  };
+}
+
+/**
+ * Extracts the global color table from the GIF data.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} colorCount - The number of colors in the global color table.
+ * @returns {Object} The global color table and the next byte index.
+ */
+function extractGlobalColorTable(arrayBuffer, colorCount) {
+  const lengthInBytes = colorCount * 3;
+  const bytes = new Uint8Array(arrayBuffer, 13, lengthInBytes);
+  const globalColorTable = [];
+
+  for (let i = 0; i < bytes.length; i += 3) {
+    globalColorTable.push({
+      r: bytes[i],
+      g: bytes[i + 1],
+      b: bytes[i + 2],
+    });
+  }
+
+  return {
+    globalColorTable,
+    nextByteIndex: 13 + lengthInBytes,
+  };
+}
+
+/**
+ * Reads the current byte and determines the block type.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} nextByteIndex - The current byte index.
+ * @returns {Object} The block type and the next byte index.
+ */
 function readCurrentByte(arrayBuffer, nextByteIndex) {
-    // Ensure the index is within the bounds of the arrayBuffer
-    if (nextByteIndex < 0 || nextByteIndex >= arrayBuffer.byteLength) {
-        throw new Error("Index out of bounds");
-    }
+  if (nextByteIndex < 0 || nextByteIndex >= arrayBuffer.byteLength) {
+    throw new Error("Index out of bounds");
+  }
 
-    const byte = new Uint8Array(arrayBuffer)[nextByteIndex];
+  const byte = new Uint8Array(arrayBuffer, nextByteIndex, 1)[0];
 
-    switch (byte) {
-        case 0x3B:
-            // GIF trailer
-            return {
-                byteType: 'Trailer',
-                nextByteIndex: nextByteIndex + 1, // Trailer is at the end of the GIF
-                rawData: null
-            };
-        case 0x21:
-            // Extension block
-            const extensionByte = new Uint8Array(arrayBuffer)[nextByteIndex + 1]; // Get the extension byte to figure out what it is
-            // Identify the extension block type
-            switch (extensionByte){
-                case 0xF9:
-                    // Graphics Control Extension
-                    return {
-                        byteType: 'GraphicControlExtension',
-                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
-                        rawData: null
-                    };
-                case 0xFF:
-                    // Application Extension
-                    return {
-                        byteType: 'ApplicationExtension',
-                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
-                        rawData: null
-                    };
-                case 0xFE:
-                    // Comment Extension
-                    return {
-                        byteType: 'CommentExtension',
-                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
-                        rawData: null
-                    };
-                case 0x01:
-                    // Plain Text Extension
-                    return {
-                        byteType: 'PlainTextExtension',
-                        nextByteIndex: nextByteIndex + 8, // Skip the next 8 bytes
-                        rawData: null
-                    };    
-                default:
-                    // Unknown extension block
-                    return {
-                        byteType: 'UnknownExtension',
-                        nextByteIndex: nextByteIndex + 1, // Move past the uknown extension block
-                        rawData: null
-                    };             
-            } 
-            
-        case 0x2C:
-            // Image Descriptor
-            return {
-                byteType: 'ImageDescriptor',
-                nextByteIndex: nextByteIndex + 10, // Skip the next 10 bytes
-                rawData: null
-            };
+  switch (byte) {
+    case 0x3b:
+      return { byteType: "Trailer", nextByteIndex: nextByteIndex + 1 };
+    case 0x21:
+      const extensionByte = new Uint8Array(arrayBuffer, nextByteIndex + 1, 1)[0];
+      switch (extensionByte) {
+        case 0xf9:
+          return { byteType: "GraphicControlExtension", nextByteIndex: nextByteIndex + 8 };
+        case 0xff:
+          return { byteType: "ApplicationExtension", nextByteIndex: nextByteIndex + 8 };
+        case 0xfe:
+          return { byteType: "CommentExtension", nextByteIndex: nextByteIndex + 8 };
+        case 0x01:
+          return { byteType: "PlainTextExtension", nextByteIndex: nextByteIndex + 8 };
         default:
-            // Unknown byte
-            return {
-                byteType: 'Unknown',
-                nextByteIndex: nextByteIndex + 1, // Move to the next byte
-                rawData: [byte]
-            };
-    }
+          return { byteType: "UnknownExtension", nextByteIndex: nextByteIndex + 1 };
+      }
+    case 0x2c:
+      return { byteType: "ImageDescriptor", nextByteIndex: nextByteIndex + 10 };
+    default:
+      return { byteType: "Unknown", nextByteIndex: nextByteIndex + 1, rawData: [byte] };
+  }
+}
+
+/**
+ * Extracts the Graphic Control Extension (GCE) data from the GIF.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} readingStart - The starting byte index.
+ * @returns {Object} The GCE data and the next byte index.
+ */
+function extractGCEData(arrayBuffer, readingStart) {
+  const bytes = new Uint8Array(arrayBuffer, readingStart, 8);
+  if (bytes[0] !== 0x21 || bytes[1] !== 0xf9) {
+    throw new Error("Invalid GCE data");
+  }
+
+  const flags = bytes[3];
+  const transparentColorIndex = bytes[4];
+  const delayTime = bytes[5] | (bytes[6] << 8);
+  const isTransparent = (flags & 0x04) !== 0;
+  const disposalMethod = (flags & 0x70) >> 4;
+
+  return {
+    byteType: "GraphicControlExtension",
+    isTransparent,
+    disposalMethod,
+    delayTime,
+    transparentColorIndex,
+    nextByteIndex: readingStart + 8,
+  };
+}
+
+/**
+ * Extracts the Application Extension data from the GIF.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} readingStart - The starting byte index.
+ * @returns {Object} The Application Extension data and the next byte index.
+ */
+function extractApplicationExtensionData(arrayBuffer, readingStart) {
+  const bytes = new Uint8Array(arrayBuffer, readingStart);
+  if (bytes[0] !== 0x21 || bytes[1] !== 0xff) {
+    throw new Error("Invalid Application Extension data");
+  }
+
+  const blockSize = bytes[2];
+  if (blockSize !== 11) {
+    throw new Error("Invalid Application Extension block size");
+  }
+
+  const applicationIdentifier = String.fromCharCode(...bytes.slice(3, 11));
+  const applicationAuthenticationCode = String.fromCharCode(...bytes.slice(11, 14));
+
+  let subBlockStart = readingStart + 14;
+  let subBlockSize = bytes[subBlockStart];
+  const subBlockData = [];
+
+  while (subBlockSize !== 0x00) {
+    subBlockStart++;
+    subBlockData.push(...bytes.slice(subBlockStart, subBlockStart + subBlockSize));
+    subBlockStart += subBlockSize;
+    subBlockSize = bytes[subBlockStart];
+  }
+
+  return {
+    byteType: "ApplicationExtension",
+    applicationIdentifier,
+    applicationAuthenticationCode,
+    subBlockData,
+    nextByteIndex: subBlockStart + 1,
+  };
+}
+
+/**
+ * Extracts the Comment Extension data from the GIF.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} readingStart - The starting byte index.
+ * @returns {Object} The Comment Extension data and the next byte index.
+ */
+function extractCommentExtensionData(arrayBuffer, readingStart) {
+  const bytes = new Uint8Array(arrayBuffer, readingStart);
+  if (bytes[0] !== 0x21 || bytes[1] !== 0xfe) {
+    throw new Error("Invalid Comment Extension data");
+  }
+
+  let comment = "";
+  let subBlockStart = readingStart + 2;
+  let subBlockSize = bytes[subBlockStart];
+
+  while (subBlockSize !== 0x00) {
+    subBlockStart++;
+    const subBlockData = bytes.slice(subBlockStart, subBlockStart + subBlockSize);
+    comment += String.fromCharCode(...subBlockData);
+    subBlockStart += subBlockSize;
+    subBlockSize = bytes[subBlockStart];
+  }
+
+  return {
+    byteType: "CommentExtension",
+    comment,
+    nextByteIndex: subBlockStart + 1,
+  };
+}
+
+/**
+ * Extracts the Plain Text Extension data from the GIF.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} readingStart - The starting byte index.
+ * @returns {Object} The Plain Text Extension data and the next byte index.
+ */
+function extractPlainTextData(arrayBuffer, readingStart) {
+  const bytes = new Uint8Array(arrayBuffer, readingStart);
+  if (bytes[0] !== 0x21 || bytes[1] !== 0x01) {
+    throw new Error("Invalid Plain Text data");
+  }
+
+  if (bytes[2] !== 0x0C) {
+    throw new Error("Invalid Plain Text block size");
+  }
+
+  const metadataBytes = new DataView(arrayBuffer, readingStart + 3, 12);
+  const leftPosition = metadataBytes.getUint16(0, true);
+  const topPosition = metadataBytes.getUint16(2, true);
+  const textGridWidth = metadataBytes.getUint16(4, true);
+  const textGridHeight = metadataBytes.getUint16(6, true);
+  const characterCellWidth = metadataBytes.getUint8(8);
+  const characterCellHeight = metadataBytes.getUint8(9);
+  const textForegroundColorIndex = metadataBytes.getUint8(10);
+  const textBackgroundColorIndex = metadataBytes.getUint8(11);
+
+  const metadata = {
+    leftPosition,
+    topPosition,
+    textGridWidth,
+    textGridHeight,
+    characterCellWidth,
+    characterCellHeight,
+    textForegroundColorIndex,
+    textBackgroundColorIndex,
+  };
+
+  let subBlockStart = readingStart + 15;
+  let subBlockSize = bytes[subBlockStart];
+  let text = "";
+
+  while (subBlockSize !== 0x00) {
+    subBlockStart++;
+    const subBlockData = bytes.slice(subBlockStart, subBlockStart + subBlockSize);
+    text += String.fromCharCode(...subBlockData);
+    subBlockStart += subBlockSize;
+    subBlockSize = bytes[subBlockStart];
+  }
+
+  return {
+    byteType: "PlainTextExtension",
+    metadata,
+    text,
+    nextByteIndex: subBlockStart + 1,
+  };
+}
+
+/**
+ * Extracts the Image Descriptor data from the GIF.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} readingStart - The starting byte index.
+ * @returns {Object} The Image Descriptor data and the next byte index.
+ */
+function extractImageDescriptor(arrayBuffer, readingStart) {
+  const bytes = new DataView(arrayBuffer, readingStart, 10);
+  if (bytes.getUint8(0) !== 0x2c) {
+    throw new Error("Invalid Image Descriptor data");
+  }
+
+  const imageLeftPosition = bytes.getUint16(1, true);
+  const imageTopPosition = bytes.getUint16(3, true);
+  const imageWidth = bytes.getUint16(5, true);
+  const imageHeight = bytes.getUint16(7, true);
+  const flags = bytes.getUint8(9);
+
+  const localColorTableFlag = (flags & 0x80) >> 7;
+  const interlaceFlag = (flags & 0x40) >> 6;
+  const sortFlag = (flags & 0x20) >> 5;
+  const localColorTableSize = localColorTableFlag ? 2 ** ((flags & 0x07) + 1) : 0;
+
+  const imageFlags = {
+    localColorTableFlag,
+    interlaceFlag,
+    sortFlag,
+    localColorTableSize,
+  };
+
+  return {
+    byteType: "ImageDescriptor",
+    imageLeftPosition,
+    imageTopPosition,
+    imageWidth,
+    imageHeight,
+    imageFlags,
+    nextByteIndex: readingStart + 10,
+  };
+}
+
+/**
+ * Extracts the Local Color Table (LCT) from the GIF.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} lctSize - The size of the local color table.
+ * @param {number} readingStart - The starting byte index.
+ * @returns {Object} The LCT colors and the next byte index.
+ */
+function extractLCT(arrayBuffer, lctSize, readingStart) {
+  const lctSizeInBytes = 3 * (2 ** (lctSize + 1));
+  const lctBytes = new Uint8Array(arrayBuffer, readingStart, lctSizeInBytes);
+  const colors = [];
+
+  for (let i = 0; i < lctSizeInBytes; i += 3) {
+    colors.push({ r: lctBytes[i], g: lctBytes[i + 1], b: lctBytes[i + 2] });
+  }
+
+  return {
+    colors,
+    nextByteIndex: readingStart + lctSizeInBytes,
+  };
+}
+
+/**
+ * Extracts the Image Data Block from the GIF.
+ * @param {ArrayBuffer} arrayBuffer - The ArrayBuffer containing the GIF data.
+ * @param {number} readingStart - The starting byte index.
+ * @returns {Object} The Image Data Block and the next byte index.
+ */
+function extractImageDataBlock(arrayBuffer, readingStart) {
+  const lzwMinimumCodeSize = new DataView(arrayBuffer, readingStart, 1).getUint8(0);
+  let subBlockStart = readingStart + 1;
+  let subBlockSize = new DataView(arrayBuffer, subBlockStart, 1).getUint8(0);
+  const imageData = [];
+
+  while (subBlockSize !== 0x00) {
+    subBlockStart++;
+    const subBlockData = new Uint8Array(arrayBuffer, subBlockStart, subBlockSize);
+    imageData.push(...subBlockData);
+    subBlockStart += subBlockSize;
+    subBlockSize = new DataView(arrayBuffer, subBlockStart, 1).getUint8(0);
+  }
+
+  return {
+    byteType: "imageDataBlock",
+    lzwMinimumCodeSize,
+    imageData,
+    nextByteIndex: subBlockStart + 1,
+  };
 }

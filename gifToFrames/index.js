@@ -1,4 +1,4 @@
-import { parseGIF } from 'gifParser.js';  // Import the parseGIF function
+import { parseGif } from './gifParser.js';
 
 const fileInput = document.getElementById('file');
 
@@ -8,7 +8,7 @@ fileInput.addEventListener('change', function(event) {
 
     if (file) {
         convertGifToArrayBuffer(file, (arrayBuffer) => {
-            parseGIF(arrayBuffer); 
+            parseGif(arrayBuffer); 
         });
     } else {
         console.error('No file selected');

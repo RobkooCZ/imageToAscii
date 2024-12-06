@@ -320,7 +320,7 @@ function modifyContrast(imageData, contrastValue) {
     return newContrastData;
 }
 
-/**
+/*
  * Inverts the colors of the given image data if the invertionBool is true.
  *
  * @param {ImageData} imageData - The image data to be inverted.
