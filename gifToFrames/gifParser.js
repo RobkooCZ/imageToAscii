@@ -20,14 +20,18 @@ export function parseGif(arrayBuffer) {
   const comments = [];
   const plainTexts = [];
 
+  let currentFrame = null;
+
   while (nextByteIndex < arrayBuffer.byteLength) {
-    const { byteType, nextByteIndex: updatedIndex } = readCurrentByte(arrayBuffer, nextByteIndex);
+    const { byteType, nextByteIndex: updatedIndex, rawData } = readCurrentByte(arrayBuffer, nextByteIndex);
+
+    console.log(`Processing byte type: ${byteType} at index: ${nextByteIndex}`);
 
     switch (byteType) {
       case "GraphicControlExtension": {
         const gceData = extractGCEData(arrayBuffer, nextByteIndex);
         nextByteIndex = gceData.nextByteIndex;
-        frames.push({ gceData });
+        currentFrame = { gceData };
         break;
       }
 
@@ -44,7 +48,15 @@ export function parseGif(arrayBuffer) {
         }
 
         const imageDataBlock = extractImageDataBlock(arrayBuffer, nextByteIndex);
-        frames.push({ imageDescriptor, localColorTable, imageDataBlock });
+        if (currentFrame) {
+          currentFrame.imageDescriptor = imageDescriptor;
+          if (!globalColorTable) currentFrame.localColorTable = localColorTable;
+          currentFrame.imageDataBlock = imageDataBlock;
+          frames.push(currentFrame);
+          currentFrame = null;
+        } else {
+          frames.push({ imageDescriptor, localColorTable, imageDataBlock });
+        }
         nextByteIndex = imageDataBlock.nextByteIndex;
         break;
       }
@@ -65,7 +77,6 @@ export function parseGif(arrayBuffer) {
 
       case "ApplicationExtension": {
         const appData = extractApplicationExtensionData(arrayBuffer, nextByteIndex);
-        // You might want to process application data if needed
         nextByteIndex = appData.nextByteIndex;
         break;
       }
@@ -90,7 +101,9 @@ export function parseGif(arrayBuffer) {
 
       default: {
         // Handle unknown or unexpected block types gracefully
-        console.warn("Unknown block type encountered:", byteType);
+        if (rawData) {
+          console.warn(`Unknown block type: 0x${rawData[0].toString(16)}`);
+        }
         nextByteIndex = updatedIndex;
         break;
       }
@@ -104,7 +117,7 @@ export function parseGif(arrayBuffer) {
     comments,
     plainTexts,
   };
-}
+};
 
 /**
  * Checks if the ArrayBuffer contains a valid GIF header.
@@ -114,7 +127,8 @@ export function parseGif(arrayBuffer) {
 function checkForGif(arrayBuffer) {
   const bytes = new Uint8Array(arrayBuffer, 0, 6);
   const header = String.fromCharCode(...bytes);
-  return header === "GIF89a" || header === "GIF87a";
+  console.log("Header:", header);
+  return header === "GIF89a";
 }
 
 /**
@@ -129,6 +143,8 @@ function getLogicalScreenDescriptor(arrayBuffer) {
   const flagBites = bytes.getUint8(4);
   const hasGlobalColorTable = (flagBites & 0x80) >> 7;
   const colorCount = hasGlobalColorTable ? 2 ** ((flagBites & 0x07) + 1) : 0;
+
+  console.log(`Width: ${width}, Height: ${height}, Global color table: ${hasGlobalColorTable}, Color count: ${colorCount}`);
 
   return {
     width,
@@ -156,6 +172,8 @@ function extractGlobalColorTable(arrayBuffer, colorCount) {
       b: bytes[i + 2],
     });
   }
+
+  console.log(`Global color table data: ${globalColorTable}`);
 
   return {
     globalColorTable,
@@ -185,11 +203,11 @@ function readCurrentByte(arrayBuffer, nextByteIndex) {
         case 0xf9:
           return { byteType: "GraphicControlExtension", nextByteIndex: nextByteIndex + 8 };
         case 0xff:
-          return { byteType: "ApplicationExtension", nextByteIndex: nextByteIndex + 8 };
+          return { byteType: "ApplicationExtension", nextByteIndex: nextByteIndex + 3 };
         case 0xfe:
-          return { byteType: "CommentExtension", nextByteIndex: nextByteIndex + 8 };
+          return { byteType: "CommentExtension", nextByteIndex: nextByteIndex + 2 };
         case 0x01:
-          return { byteType: "PlainTextExtension", nextByteIndex: nextByteIndex + 8 };
+          return { byteType: "PlainTextExtension", nextByteIndex: nextByteIndex + 2 };
         default:
           return { byteType: "UnknownExtension", nextByteIndex: nextByteIndex + 1 };
       }
@@ -218,6 +236,8 @@ function extractGCEData(arrayBuffer, readingStart) {
   const isTransparent = (flags & 0x04) !== 0;
   const disposalMethod = (flags & 0x70) >> 4;
 
+  console.log(`Disposal method: ${disposalMethod}, Delay time: ${delayTime}, Transparent color index: ${transparentColorIndex}`);
+
   return {
     byteType: "GraphicControlExtension",
     isTransparent,
@@ -235,7 +255,7 @@ function extractGCEData(arrayBuffer, readingStart) {
  * @returns {Object} The Application Extension data and the next byte index.
  */
 function extractApplicationExtensionData(arrayBuffer, readingStart) {
-  const bytes = new Uint8Array(arrayBuffer, readingStart);
+  const bytes = new Uint8Array(arrayBuffer, readingStart, 19);
   if (bytes[0] !== 0x21 || bytes[1] !== 0xff) {
     throw new Error("Invalid Application Extension data");
   }
@@ -249,15 +269,17 @@ function extractApplicationExtensionData(arrayBuffer, readingStart) {
   const applicationAuthenticationCode = String.fromCharCode(...bytes.slice(11, 14));
 
   let subBlockStart = readingStart + 14;
-  let subBlockSize = bytes[subBlockStart];
+  let subBlockSize = bytes[14];
   const subBlockData = [];
 
   while (subBlockSize !== 0x00) {
     subBlockStart++;
-    subBlockData.push(...bytes.slice(subBlockStart, subBlockStart + subBlockSize));
+    subBlockData.push(...new Uint8Array(arrayBuffer, subBlockStart, subBlockSize));
     subBlockStart += subBlockSize;
-    subBlockSize = bytes[subBlockStart];
+    subBlockSize = new Uint8Array(arrayBuffer, subBlockStart, 1)[0];
   }
+
+  console.log(`Application identifier: ${applicationIdentifier}, Authentication code: ${applicationAuthenticationCode}`);
 
   return {
     byteType: "ApplicationExtension",
@@ -291,6 +313,8 @@ function extractCommentExtensionData(arrayBuffer, readingStart) {
     subBlockStart += subBlockSize;
     subBlockSize = bytes[subBlockStart];
   }
+
+  console.log(`Comment: ${comment}`);
 
   return {
     byteType: "CommentExtension",
@@ -348,6 +372,8 @@ function extractPlainTextData(arrayBuffer, readingStart) {
     subBlockSize = bytes[subBlockStart];
   }
 
+  console.log(`Text: ${text}, Metadata: ${metadata}`);
+
   return {
     byteType: "PlainTextExtension",
     metadata,
@@ -377,7 +403,7 @@ function extractImageDescriptor(arrayBuffer, readingStart) {
   const localColorTableFlag = (flags & 0x80) >> 7;
   const interlaceFlag = (flags & 0x40) >> 6;
   const sortFlag = (flags & 0x20) >> 5;
-  const localColorTableSize = localColorTableFlag ? 2 ** ((flags & 0x07) + 1) : 0;
+  const localColorTableSize = localColorTableFlag ? (flags & 0x07) : 0;
 
   const imageFlags = {
     localColorTableFlag,
@@ -385,6 +411,8 @@ function extractImageDescriptor(arrayBuffer, readingStart) {
     sortFlag,
     localColorTableSize,
   };
+
+  console.log(`Image left position: ${imageLeftPosition}, Image top position: ${imageTopPosition}, Image width: ${imageWidth}, Image height: ${imageHeight}, Flags: ${JSON.stringify(imageFlags)}`);
 
   return {
     byteType: "ImageDescriptor",
@@ -406,12 +434,20 @@ function extractImageDescriptor(arrayBuffer, readingStart) {
  */
 function extractLCT(arrayBuffer, lctSize, readingStart) {
   const lctSizeInBytes = 3 * (2 ** (lctSize + 1));
+  
+  // Check if the lctSizeInBytes is valid
+  if (lctSizeInBytes <= 0 || lctSizeInBytes > arrayBuffer.byteLength - readingStart) {
+    throw new Error(`Invalid LCT size: ${lctSizeInBytes}`);
+  }
+
   const lctBytes = new Uint8Array(arrayBuffer, readingStart, lctSizeInBytes);
   const colors = [];
 
   for (let i = 0; i < lctSizeInBytes; i += 3) {
     colors.push({ r: lctBytes[i], g: lctBytes[i + 1], b: lctBytes[i + 2] });
   }
+
+  console.log(`Local color table data: ${colors}`);
 
   return {
     colors,
@@ -438,6 +474,8 @@ function extractImageDataBlock(arrayBuffer, readingStart) {
     subBlockStart += subBlockSize;
     subBlockSize = new DataView(arrayBuffer, subBlockStart, 1).getUint8(0);
   }
+
+  console.log(`LZW minimum code size: ${lzwMinimumCodeSize}, Image data: ${imageData}`);
 
   return {
     byteType: "imageDataBlock",
